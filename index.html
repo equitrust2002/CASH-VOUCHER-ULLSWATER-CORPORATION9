@@ -1,0 +1,283 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Ullswater Pro | Enterprise Voucher</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+    
+    <style>
+        :root { --primary: #000; --cash: #008f39; --check: #0056b3; --accent: #008f39; }
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #dfe4ea; margin: 0; padding: 10px; -webkit-print-color-adjust: exact; }
+        
+        /* Layout */
+        .container { 
+            width: 100%; max-width: 210mm; background: #fff; margin: 0 auto; padding: 25px; 
+            box-sizing: border-box; border: 4px solid var(--primary); position: relative; 
+        }
+
+        .header { display: flex; justify-content: space-between; border-bottom: 5px solid var(--primary); padding-bottom: 10px; margin-bottom: 20px; }
+        .brand h1 { margin: 0; font-size: 22px; font-weight: 900; text-transform: uppercase; letter-spacing: -1px; }
+        .cv-title { font-size: 18px; font-weight: 900; color: var(--accent); margin: 0; text-transform: uppercase; }
+        #vID { font-weight: 900; background: #000; color: #fff; padding: 6px 12px; font-size: 16px; display: inline-block; border-radius: 2px; }
+
+        .form-grid { display: grid; grid-template-columns: 1fr; gap: 10px; margin-bottom: 15px; }
+        @media (min-width: 600px) { .form-grid { grid-template-columns: 1.5fr 1fr; gap: 20px; } }
+
+        .row { border-bottom: 1.5px solid #000; padding: 8px 0; }
+        .label { font-size: 10px; font-weight: 900; text-transform: uppercase; color: #555; display: block; }
+        
+        input, textarea { border: none; outline: none; font-size: 16px; width: 100%; background: transparent; text-transform: uppercase; font-weight: 700; color: #000; display: block; padding: 4px 0; }
+        
+        /* THE GHOST MIRROR: Critical for iOS/Android Printing */
+        .ghost-text { display: none; font-size: 15px; font-weight: 700; text-transform: uppercase; color: #000; white-space: pre-wrap; word-break: break-all; min-height: 20px; }
+
+        table { width: 100%; border-collapse: collapse; margin: 15px 0; border: 2.5px solid #000; }
+        th { background: var(--primary); color: #fff; padding: 8px; font-size: 10px; text-align: left; text-transform: uppercase; }
+        td { border: 1.5px solid #000; padding: 10px; vertical-align: top; }
+
+        .amount-section { border: 4px solid var(--accent); margin-top: 10px; }
+        .words-box { padding: 12px; background: #f9f9f9; font-size: 12px; font-weight: 900; text-transform: uppercase; border-bottom: 1px solid #ddd; color: #000; min-height: 2.5em; line-height: 1.2; }
+        .num-box { padding: 12px; background: #fff; font-size: 28px; font-weight: 900; color: var(--accent); text-align: center; }
+
+        .sigs { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; margin-top: 40px; }
+        .sig-line { border-top: 2px solid #000; padding-top: 5px; text-align: center; font-size: 9px; font-weight: 900; text-transform: uppercase; }
+        
+        .footer { margin-top: 20px; border-top: 2.5px solid #000; padding-top: 10px; display: flex; justify-content: space-between; align-items: center; font-size: 8px; font-weight: 800; }
+        #qrcode { background: #fff; padding: 5px; border: 1px solid #000; display: flex; align-items: center; justify-content: center; }
+
+        /* Controls */
+        .toolbar { position: sticky; top: 0; background: #dfe4ea; padding: 10px; display: flex; flex-wrap: wrap; gap: 6px; z-index: 1000; justify-content: center; border-bottom: 1px solid #bbb; }
+        .btn { padding: 12px; border: none; color: #fff; font-weight: 900; font-size: 10px; cursor: pointer; border-radius: 4px; text-transform: uppercase; flex-grow: 1; max-width: 140px; }
+        .btn-print { background: #008f39; border: 1.5px solid #fff; }
+        .btn-util { background: #2d3436; }
+        .btn-reset { background: #d63031; }
+
+        @media print { 
+            .no-print { display: none !important; } 
+            body { background: #fff; padding: 0; }
+            .container { width: 100%; border: 3px solid #000; box-shadow: none; padding: 10px; margin: 0; }
+            input, textarea { display: none !important; }
+            .ghost-text { display: block !important; }
+            .words-box, .num-box { color: #000 !important; border-color: #000 !important; }
+            .cv-title { color: #000 !important; }
+        }
+    </style>
+</head>
+<body>
+
+<nav class="toolbar no-print">
+    <button class="btn btn-print" onclick="smartPrint()">PRINT / SAVE PDF</button>
+    <button class="btn btn-util" onclick="saveJSON()">SAVE JSON</button>
+    <button class="btn btn-util" onclick="saveCSV()">SAVE CSV</button>
+    <button class="btn btn-util" onclick="document.getElementById('bulkLoad').click()">LOAD JSON</button>
+    <button class="btn btn-reset" onclick="fullReset()">CLEAR ALL</button>
+    
+    <select id="vMode" onchange="toggleMode()" style="padding:10px; font-weight:900; border:2px solid #000; border-radius:4px; font-size: 10px;">
+        <option value="CASH">CASH MODE</option>
+        <option value="CHECK">CHECK MODE</option>
+    </select>
+    <input type="file" id="bulkLoad" style="display:none" accept=".json" onchange="handleBulk(event)">
+</nav>
+
+<div class="container" id="voucher">
+    <header class="header">
+        <div class="brand">
+            <h1 id="coName" contenteditable="true" onblur="saveCo()">ULLSWATER CORPORATION</h1>
+            <p style="margin:0; font-size:9px; font-weight:800;">FINANCE & OPERATIONS UNIT</p>
+        </div>
+        <div class="cv-meta" style="text-align:right">
+            <p class="cv-title" id="typeTitle">CASH VOUCHER</p>
+            <div id="vID">CV-2026-0001</div>
+        </div>
+    </header>
+
+    <div class="form-grid">
+        <div class="left">
+            <div class="row">
+                <span class="label">Pay To:</span>
+                <input type="text" id="payee" oninput="syncAll()" placeholder="PAYEE NAME">
+                <div class="ghost-text" id="g_payee"></div>
+            </div>
+            <div class="row">
+                <span class="label">Particulars:</span>
+                <textarea id="part" rows="1" oninput="syncAll()" placeholder="PAYMENT PURPOSE"></textarea>
+                <div class="ghost-text" id="g_part"></div>
+            </div>
+        </div>
+        <div class="right">
+            <div class="row">
+                <span class="label">Date:</span>
+                <input type="date" id="vDate" oninput="syncAll()">
+                <div class="ghost-text" id="g_date"></div>
+            </div>
+            <div class="row">
+                <span class="label" id="refLabel">Ref No:</span>
+                <input type="text" id="ref" oninput="syncAll()" placeholder="N/A">
+                <div class="ghost-text" id="g_ref"></div>
+            </div>
+        </div>
+    </div>
+
+    <table>
+        <thead><tr><th width="70%">Account Category / Description</th><th width="30%">Amount (PHP)</th></tr></thead>
+        <tbody>
+            <tr>
+                <td>
+                    <textarea id="acct" rows="2" oninput="syncAll()" placeholder="ACCOUNTING CATEGORY"></textarea>
+                    <div class="ghost-text" id="g_acct"></div>
+                </td>
+                <td>
+                    <input type="number" id="amount" step="0.01" style="text-align:right; font-size:22px;" oninput="syncAll()" placeholder="0.00">
+                    <div class="ghost-text" id="g_amount" style="text-align:right; font-size:22px;"></div>
+                </td>
+            </tr>
+        </tbody>
+    </table>
+
+    <div class="amount-section">
+        <div class="words-box" id="amtWords">ZERO PESOS ONLY</div>
+        <div class="num-box" id="dispAmt">₱ 0.00</div>
+    </div>
+
+    <div class="sigs">
+        <div class="sig-line">Prepared By</div>
+        <div class="sig-line">Approved By</div>
+        <div class="sig-line">Received By</div>
+    </div>
+
+    <div class="footer">
+        <div>ULLSWATER CORPORATION • 2026 AUDIT COMPLIANT</div>
+        <div id="qrcode"></div>
+    </div>
+</div>
+
+<script>
+    // Core Sync Logic
+    function syncAll() {
+        const val = parseFloat(document.getElementById('amount').value) || 0;
+        
+        // Update Displays
+        document.getElementById('dispAmt').innerText = "₱ " + val.toLocaleString(undefined, {minimumFractionDigits: 2});
+        document.getElementById('amtWords').innerText = convertToWords(val);
+        
+        // Update Ghost Mirror (Critical for PDF/Print)
+        const fields = ['payee', 'part', 'ref', 'acct', 'amount', 'vDate'];
+        fields.forEach(id => {
+            const input = document.getElementById(id);
+            const ghost = document.getElementById('g_' + id);
+            if (input && ghost) {
+                ghost.innerText = (id === 'amount' ? val.toFixed(2) : input.value).toUpperCase();
+            }
+        });
+        updateQR();
+    }
+
+    function updateQR() {
+        const info = [
+            `ID: ${document.getElementById('vID').innerText}`,
+            `DT: ${document.getElementById('vDate').value}`,
+            `PY: ${document.getElementById('payee').value}`,
+            `AM: ${document.getElementById('amount').value}`,
+            `PR: ${document.getElementById('part').value}`,
+            `RF: ${document.getElementById('ref').value}`
+        ].join('|');
+
+        const target = document.getElementById("qrcode");
+        target.innerHTML = "";
+        if(document.getElementById('payee').value.length > 0) {
+            new QRCode(target, { text: info, width: 100, height: 100 });
+        }
+    }
+
+    function smartPrint() {
+        syncAll();
+        window.print();
+        // Increment sequence after print
+        let seq = parseInt(localStorage.getItem('ull_seq') || 1);
+        localStorage.setItem('ull_seq', seq + 1);
+    }
+
+    function convertToWords(num) {
+        if (num <= 0) return "ZERO PESOS ONLY";
+        const a = ['', 'one ', 'two ', 'three ', 'four ', 'five ', 'six ', 'seven ', 'eight ', 'nine ', 'ten ', 'eleven ', 'twelve ', 'thirteen ', 'fourteen ', 'fifteen ', 'sixteen ', 'seventeen ', 'eighteen ', 'nineteen '];
+        const b = ['', '', 'twenty ', 'thirty ', 'forty ', 'fifty ', 'sixty ', 'seventy ', 'eighty ', 'ninety '];
+        const g = (n) => {
+            let s = '';
+            if (n >= 100) { s += a[Math.floor(n / 100)] + 'hundred '; n %= 100; }
+            if (n >= 20) { s += b[Math.floor(n / 10)] + a[n % 10]; } else { s += a[n]; }
+            return s;
+        };
+        let r = '', w = Math.floor(num), c = Math.round((num - w) * 100);
+        if (w >= 1e6) { r += g(Math.floor(w / 1e6)) + 'million '; w %= 1e6; }
+        if (w >= 1e3) { r += g(Math.floor(w / 1e3)) + 'thousand '; w %= 1e3; }
+        r += g(w);
+        let res = r.trim() + (c > 0 ? " and " + c + "/100" : "");
+        return (res + " pesos only").toUpperCase();
+    }
+
+    // Data Management
+    function saveJSON() {
+        const d = { 
+            id: document.getElementById('vID').innerText, 
+            dt: document.getElementById('vDate').value, 
+            py: document.getElementById('payee').value, 
+            am: document.getElementById('amount').value,
+            pr: document.getElementById('part').value,
+            ac: document.getElementById('acct').value,
+            rf: document.getElementById('ref').value
+        };
+        downloadFile(JSON.stringify(d, null, 2), `${d.id}.json`, 'application/json');
+    }
+
+    function saveCSV() {
+        const headers = "VOUCHER_ID,DATE,PAYEE,AMOUNT,PURPOSE,REFERENCE\n";
+        const data = `${document.getElementById('vID').innerText},${document.getElementById('vDate').value},"${document.getElementById('payee').value}",${document.getElementById('amount').value},"${document.getElementById('part').value}","${document.getElementById('ref').value}"`;
+        downloadFile(headers + data, `LOG_${document.getElementById('vID').innerText}.csv`, 'text/csv');
+    }
+
+    function downloadFile(content, fileName, type) {
+        const b = new Blob([content], {type: type});
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(b);
+        a.download = fileName;
+        a.click();
+    }
+
+    function handleBulk(e) {
+        const file = e.target.files[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = (ev) => {
+            const data = JSON.parse(ev.target.result);
+            document.getElementById('payee').value = data.py || "";
+            document.getElementById('amount').value = data.am || 0;
+            document.getElementById('part').value = data.pr || "";
+            document.getElementById('acct').value = data.ac || "";
+            document.getElementById('ref').value = data.rf || "";
+            syncAll();
+        };
+        reader.readAsText(file);
+    }
+
+    function toggleMode() {
+        const m = document.getElementById('vMode').value;
+        document.getElementById('typeTitle').innerText = m + " VOUCHER";
+        document.documentElement.style.setProperty('--accent', m === 'CASH' ? 'var(--cash)' : 'var(--check)');
+        document.getElementById('refLabel').innerText = m === 'CASH' ? 'Ref No:' : 'Check No:';
+        syncAll();
+    }
+
+    function saveCo() { localStorage.setItem('ull_name', document.getElementById('coName').innerText); }
+    function fullReset() { if(confirm("Clear all data and reset counter?")) { localStorage.clear(); location.reload(); } }
+
+    window.onload = () => {
+        let n = localStorage.getItem('ull_seq') || 1;
+        document.getElementById('vID').innerText = "CV-2026-" + n.toString().padStart(4, '0');
+        document.getElementById('vDate').valueAsDate = new Date();
+        document.getElementById('coName').innerText = localStorage.getItem('ull_name') || "ULLSWATER CORPORATION";
+        syncAll();
+    };
+</script>
+</body>
+</html>
